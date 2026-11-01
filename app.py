@@ -85,7 +85,7 @@ if prompt:
                 المهمة: اعتمد على المحتوى المرفوع التالي لشرح المفاهيم وحل الأسئلة والمسائل للطلاب باللغة العربية بأسلوب منظم وواضح:
 
                 المحتوى المرفوع للمادة:
-                {subject_context[:100000]}
+                {subject_context[:60000]}
                 """
 
                 chat_completion = client.chat.completions.create(
@@ -93,7 +93,7 @@ if prompt:
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": prompt}
                     ],
-                    model="llama-3.1-70b-versatile",
+                    model="llama-3.1-8b-instant",
                 )
 
                 answer = chat_completion.choices[0].message.content
