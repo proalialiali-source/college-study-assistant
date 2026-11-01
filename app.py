@@ -80,6 +80,11 @@ if prompt:
             try:
                 client = Groq(api_key=GROQ_API_KEY)
                 
+                # اختيار موديل صالح ونشط تلقائياً من حسابك
+                models_data = client.models.list()
+                available_models = [m.id for m in models_data.data if "whisper" not in m.id]
+                chosen_model = available_models[0]
+
                 system_instruction = f"""
                 أنت معيد ومساعد دراسي جامعي متخصص في مادة: {selected_subject}.
                 المهمة: اعتمد على المحتوى المرفوع التالي لشرح المفاهيم وحل الأسئلة والمسائل للطلاب باللغة العربية بأسلوب منظم وواضح:
@@ -93,7 +98,7 @@ if prompt:
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": prompt}
                     ],
-                    model="llama-3.1-8b-instant",
+                    model=chosen_model,
                 )
 
                 answer = chat_completion.choices[0].message.content
