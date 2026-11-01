@@ -96,7 +96,7 @@ if prompt:
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": prompt}
                     ],
-                    model="gemma2-9b-it",
+                    model="mixtral-8x7b-32768",
                 )
 
                 answer = chat_completion.choices[0].message.content
