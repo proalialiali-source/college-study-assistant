@@ -1,14 +1,14 @@
 import os
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 from pypdf import PdfReader
 
-# مفتاح Gemini API المدمج
-API_KEY = "AQ.Ab8RN6J58G46pYqJ5AowcHhsSOputo9izMg6oALzusOc8WBA5g"
+# مفتاح الـ API المدمج
+API_KEY = "AQ.Ab8RN6L0dcsYSC03V54t8mfX1pwThvVT-taScxNHuifgCGHt_Q"
 
 st.set_page_config(page_title="مساعد مواد الكلية", layout="wide")
 
-# قائمة المواد الستة المطابقة للمجلدات
+# قائمة المواد الستة
 SUBJECTS = ["CS", "DS", "MATH0", "LINEAR", "PROBABILITY", "PROGRAMMING"]
 
 with st.sidebar:
@@ -16,7 +16,7 @@ with st.sidebar:
     selected_subject = st.selectbox("حدد المادة:", SUBJECTS)
     st.divider()
 
-# قراءة الملفات من مجلد المادة المحددة
+# استخراج النصوص من ملفات الـ PDF
 @st.cache_resource
 def load_subject_materials(subject_name):
     combined_text = ""
@@ -31,7 +31,7 @@ def load_subject_materials(subject_name):
                 for page in reader.pages:
                     text = page.extract_text()
                     if text:
-                        combined_text += text + "\n"
+                        combined_text += f"\n--- ملف: {pdf} ---\n" + text
             except Exception:
                 continue
     return combined_text, pdf_files
@@ -44,10 +44,10 @@ with st.sidebar:
         for p in loaded_pdfs:
             st.markdown(f"- 📄 `{p}`")
     else:
-        st.info("لم يتم رفع ملفات PDF لهذه المادة بعد.")
+        st.info("لم يتم العثور على ملفات PDF. تأكد من رفعها داخل مجلد المادة.")
 
 st.title(f"📖 المساعد الذكي لمادة: {selected_subject}")
-st.write(f"اسأل في أي جزئية تخص **{selected_subject}** وهيجاوبك ويشرحلك منها مباشرة!")
+st.write(f"المساعد جاهز للشرح وحل التدريبات بناءً على ملفات ومحاضرات **{selected_subject}** المرفوعة.")
 
 # مسح المحادثة السابقة عند تغيير المادة
 if "active_subject" not in st.session_state:
@@ -72,31 +72,28 @@ if prompt:
         st.markdown(prompt)
 
     if not subject_context.strip():
-        warning_msg = f"لم يتم العثور على ملفات PDF داخل مجلد {selected_subject}. يرجى رفع ملفات المادة داخل المجلد في GitHub."
+        warning_msg = f"لم يتم العثور على ملفات PDF داخل مجلد {selected_subject}."
         st.warning(warning_msg)
         st.session_state.messages.append({"role": "assistant", "content": warning_msg})
     else:
         try:
-            genai.configure(api_key=API_KEY.strip())
-            
-            try:
-                model = genai.GenerativeModel("models/gemini-1.5-flash")
-            except Exception:
-                model = genai.GenerativeModel("gemini-pro")
+            client = genai.Client(api_key=API_KEY.strip())
 
             with st.spinner(f"جاري تحضير الشرح من واقع ملفات {selected_subject}..."):
                 system_instruction = f"""
-                أنت معيد ومساعد دراسي جامعي متخصص في مادة: {selected_subject}.
-                المهمة: اعتمد حصرياً وبدقة على المحتوى التالي المستخرج من محاضرات وملخصات {selected_subject}.
-                اشرح بأسلوب مبسط ومنظم للطلاب، وحل الأسئلة والمسائل وفق ما ورد في هذه الملفات فقط باللغة العربية.
+                أنت معيد جامعي متميز ومساعد دراسي متخصص في مادة: {selected_subject}.
+                المهمة: اشرح المفاهيم وحل المسائل بالاعتماد الحصري والمباشر على المحتوى التالي المستخرج من محاضرات وملخصات {selected_subject}.
+                قدم الشرح باللغة العربية بأسلوب منظم، مبسط وواضح جداً للطلاب.
 
-                المحتوى المعتمد للمادة:
+                المحتوى التعليمي المرفوع:
                 {subject_context}
                 """
-                
-                full_prompt = f"{system_instruction}\n\nسؤال الطالب: {prompt}"
-                response = model.generate_content(full_prompt)
-                
+
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[system_instruction, f"سؤال الطالب: {prompt}"]
+                )
+
                 answer = response.text
                 with st.chat_message("assistant"):
                     st.markdown(answer)
