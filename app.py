@@ -1,10 +1,10 @@
 import os
 import streamlit as st
-from google import genai
+import requests
 from pypdf import PdfReader
 
-# مفتاح الـ API المدمج
-API_KEY = "AQ.Ab8RN6L0dcsYSC03V54t8mfX1pwThvVT-taScxNHuifgCGHt_Q"
+# مفتاح التوثيق الخاص بك
+AUTH_TOKEN = "AQ.Ab8RN6Kjgc6W3OidflpqI-TSUmlJSmHCghJ7Wg77NlonFGCKqA"
 
 st.set_page_config(page_title="مساعد مواد الكلية", layout="wide")
 
@@ -44,12 +44,12 @@ with st.sidebar:
         for p in loaded_pdfs:
             st.markdown(f"- 📄 `{p}`")
     else:
-        st.info("لم يتم العثور على ملفات PDF. تأكد من رفعها داخل مجلد المادة.")
+        st.info("لم يتم العثور على ملفات PDF داخل هذا المجلد.")
 
 st.title(f"📖 المساعد الذكي لمادة: {selected_subject}")
 st.write(f"المساعد جاهز للشرح وحل التدريبات بناءً على ملفات ومحاضرات **{selected_subject}** المرفوعة.")
 
-# مسح المحادثة السابقة عند تغيير المادة
+# مسح سجل الشات عند تغيير المادة
 if "active_subject" not in st.session_state:
     st.session_state.active_subject = selected_subject
 
@@ -72,32 +72,45 @@ if prompt:
         st.markdown(prompt)
 
     if not subject_context.strip():
-        warning_msg = f"لم يتم العثور على ملفات PDF داخل مجلد {selected_subject}."
+        warning_msg = f"لم يتم العثور على ملفات PDF داخل مجلد {selected_subject}. تأكد من رفع ملفات المادة."
         st.warning(warning_msg)
         st.session_state.messages.append({"role": "assistant", "content": warning_msg})
     else:
-        try:
-            client = genai.Client(api_key=API_KEY.strip())
+        with st.spinner(f"جاري تحضير الشرح من واقع ملفات {selected_subject}..."):
+            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+            headers = {
+                "Authorization": f"Bearer {AUTH_TOKEN.strip()}",
+                "Content-Type": "application/json"
+            }
+            system_instruction = f"""
+            أنت معيد ومساعد دراسي جامعي متخصص في مادة: {selected_subject}.
+            المهمة: اشرح المفاهيم وحل المسائل بالاعتماد الحصري والمباشر على المحتوى التالي المستخرج من محاضرات وملخصات {selected_subject}.
+            قدم الشرح باللغة العربية بأسلوب منظم، مبسط وواضح جداً للطلاب.
 
-            with st.spinner(f"جاري تحضير الشرح من واقع ملفات {selected_subject}..."):
-                system_instruction = f"""
-                أنت معيد جامعي متميز ومساعد دراسي متخصص في مادة: {selected_subject}.
-                المهمة: اشرح المفاهيم وحل المسائل بالاعتماد الحصري والمباشر على المحتوى التالي المستخرج من محاضرات وملخصات {selected_subject}.
-                قدم الشرح باللغة العربية بأسلوب منظم، مبسط وواضح جداً للطلاب.
+            المحتوى التعليمي المرفوع:
+            {subject_context}
+            """
+            
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": f"{system_instruction}\n\nسؤال الطالب: {prompt}"}
+                        ]
+                    }
+                ]
+            }
 
-                المحتوى التعليمي المرفوع:
-                {subject_context}
-                """
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=60)
+                res_data = response.json()
 
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[system_instruction, f"سؤال الطالب: {prompt}"]
-                )
-
-                answer = response.text
-                with st.chat_message("assistant"):
-                    st.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-
-        except Exception as e:
-            st.error(f"حدث خطأ: {e}")
+                if response.status_code == 200:
+                    answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                    with st.chat_message("assistant"):
+                        st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                else:
+                    st.error(f"حدث خطأ في الاتصال: {res_data}")
+            except Exception as e:
+                st.error(f"حدث خطأ: {e}")
