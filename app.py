@@ -1,10 +1,10 @@
 import os
 import streamlit as st
-import requests
+from groq import Groq
 from pypdf import PdfReader
 
-# مفتاح التوثيق الخاص بك
-AUTH_TOKEN = "AQ.Ab8RN6Kjgc6W3OidflpqI-TSUmlJSmHCghJ7Wg77NlonFGCKqA"
+# مفتاح Groq الخاص بك
+GROQ_API_KEY = "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"
 
 st.set_page_config(page_title="مساعد مواد الكلية", layout="wide")
 
@@ -16,7 +16,7 @@ with st.sidebar:
     selected_subject = st.selectbox("حدد المادة:", SUBJECTS)
     st.divider()
 
-# استخراج النصوص من ملفات الـ PDF
+# قراءة الملفات من المجلد المحدد
 @st.cache_resource
 def load_subject_materials(subject_name):
     combined_text = ""
@@ -72,45 +72,34 @@ if prompt:
         st.markdown(prompt)
 
     if not subject_context.strip():
-        warning_msg = f"لم يتم العثور على ملفات PDF داخل مجلد {selected_subject}. تأكد من رفع ملفات المادة."
+        warning_msg = f"لم يتم العثور على ملفات PDF داخل مجلد {selected_subject}. يرجى التأكد من رفع الملفات."
         st.warning(warning_msg)
         st.session_state.messages.append({"role": "assistant", "content": warning_msg})
     else:
         with st.spinner(f"جاري تحضير الشرح من واقع ملفات {selected_subject}..."):
-            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-            headers = {
-                "Authorization": f"Bearer {AUTH_TOKEN.strip()}",
-                "Content-Type": "application/json"
-            }
-            system_instruction = f"""
-            أنت معيد ومساعد دراسي جامعي متخصص في مادة: {selected_subject}.
-            المهمة: اشرح المفاهيم وحل المسائل بالاعتماد الحصري والمباشر على المحتوى التالي المستخرج من محاضرات وملخصات {selected_subject}.
-            قدم الشرح باللغة العربية بأسلوب منظم، مبسط وواضح جداً للطلاب.
-
-            المحتوى التعليمي المرفوع:
-            {subject_context}
-            """
-            
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": f"{system_instruction}\n\nسؤال الطالب: {prompt}"}
-                        ]
-                    }
-                ]
-            }
-
             try:
-                response = requests.post(url, headers=headers, json=payload, timeout=60)
-                res_data = response.json()
+                client = Groq(api_key=GROQ_API_KEY)
+                
+                system_instruction = f"""
+                أنت معيد ومساعد دراسي جامعي متخصص في مادة: {selected_subject}.
+                المهمة: اعتمد على المحتوى المرفوع التالي لشرح المفاهيم وحل الأسئلة والمسائل للطلاب باللغة العربية بأسلوب منظم وواضح:
 
-                if response.status_code == 200:
-                    answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
-                    with st.chat_message("assistant"):
-                        st.markdown(answer)
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                else:
-                    st.error(f"حدث خطأ في الاتصال: {res_data}")
+                المحتوى المرفوع للمادة:
+                {subject_context[:100000]}
+                """
+
+                chat_completion = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": prompt}
+                    ],
+                    model="llama-3.3-70b-versatile",
+                )
+
+                answer = chat_completion.choices[0].message.content
+                with st.chat_message("assistant"):
+                    st.markdown(answer)
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+
             except Exception as e:
                 st.error(f"حدث خطأ: {e}")
