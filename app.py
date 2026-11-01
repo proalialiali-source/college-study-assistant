@@ -80,17 +80,20 @@ if prompt:
             try:
                 client = Groq(api_key=GROQ_API_KEY)
                 
-                # اختيار موديل صالح ونشط تلقائياً من حسابك
+                # جلب الموديل المتاح تلقائياً
                 models_data = client.models.list()
                 available_models = [m.id for m in models_data.data if "whisper" not in m.id]
                 chosen_model = available_models[0]
+
+                # ضبط حجم السياق ليكون أقل من 8000 توكن تفادياً لتجاوز الحد المسموح
+                safe_context = subject_context[:12000]
 
                 system_instruction = f"""
                 أنت معيد ومساعد دراسي جامعي متخصص في مادة: {selected_subject}.
                 المهمة: اعتمد على المحتوى المرفوع التالي لشرح المفاهيم وحل الأسئلة والمسائل للطلاب باللغة العربية بأسلوب منظم وواضح:
 
                 المحتوى المرفوع للمادة:
-                {subject_context[:60000]}
+                {safe_context}
                 """
 
                 chat_completion = client.chat.completions.create(
