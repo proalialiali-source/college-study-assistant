@@ -79,14 +79,9 @@ if prompt:
         with st.spinner(f"جاري تحضير الشرح من واقع ملفات {selected_subject}..."):
             try:
                 client = Groq(api_key=GROQ_API_KEY)
-                
-                # جلب الموديل المتاح تلقائياً
-                models_data = client.models.list()
-                available_models = [m.id for m in models_data.data if "whisper" not in m.id]
-                chosen_model = available_models[0]
 
-                # ضبط حجم السياق ليكون أقل من 8000 توكن تفادياً لتجاوز الحد المسموح
-                safe_context = subject_context[:12000]
+                # حجم سياق مناسب لحدود Groq المجانية
+                safe_context = subject_context[:10000]
 
                 system_instruction = f"""
                 أنت معيد ومساعد دراسي جامعي متخصص في مادة: {selected_subject}.
@@ -101,7 +96,7 @@ if prompt:
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": prompt}
                     ],
-                    model=chosen_model,
+                    model="gemma2-9b-it",
                 )
 
                 answer = chat_completion.choices[0].message.content
